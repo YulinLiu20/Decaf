@@ -8,7 +8,7 @@ app = Flask(__name__)
 def get_rewards():
     end_time = datetime.utcnow()
     # ICP主网上线时间
-    start_time = datetime(2021, 5, 10)
+    start_time = datetime(2021, 6, 10)
     #start_time = end_time - timedelta(days=10 * 365)
     start_ts = int(start_time.timestamp())
     end_ts = int(end_time.timestamp())
