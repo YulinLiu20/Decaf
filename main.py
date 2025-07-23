@@ -77,4 +77,10 @@ def get_rewards():
     else:
         result["binance_error"] = f"Failed to fetch Binance data: {binance_resp.text}"
 
-    # 备注：自2025年1月1日起，Binance返回的open_time字段单
+    # 备注：自2025年1月1日起，Binance返回的open_time字段单位由毫秒(ms)变为微秒(μs)，
+    # 需除以1000后再转为datetime。此处已自动判断处理。
+
+    return jsonify(result)
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=8080)
