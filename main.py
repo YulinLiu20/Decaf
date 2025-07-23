@@ -7,9 +7,7 @@ app = Flask(__name__)
 @app.route("/api/rewards")
 def get_rewards():
     end_time = datetime.utcnow()
-    # ICP主网上线时间
     start_time = datetime(2021, 6, 10)
-    #start_time = end_time - timedelta(days=10 * 365)
     start_ts = int(start_time.timestamp())
     end_ts = int(end_time.timestamp())
     step = 86400  # 每天
@@ -18,11 +16,6 @@ def get_rewards():
     url_rewards = f"https://ic-api.internetcomputer.org/api/v3/timeseries/reward-node-providers?start={start_ts}&end={end_ts}&step={step}"
     response_rewards = requests.get(url_rewards)
     data_rewards = response_rewards.json()
-
-    # 新增汇率数据
-    url_rates = f"https://ic-api.internetcomputer.org/api/v3/timeseries/icp-xdr-conversion-rates?start={start_ts}&end={end_ts}&step={step}"
-    response_rates = requests.get(url_rates)
-    data_rates = response_rates.json()
 
     result = {}
 
@@ -52,24 +45,68 @@ def get_rewards():
         result["rewards_error"] = "No reward_node_providers data found."
         result["rewards_raw"] = data_rewards
 
-    # 处理汇率数据
-    if "icp_xdr_conversion_rates" in data_rates and len(data_rates["icp_xdr_conversion_rates"]) > 0:
-        rates_raw = data_rates["icp_xdr_conversion_rates"]
-        rates, rates_timestamps_raw = zip(*rates_raw)
-        rates_timestamps = [datetime.utcfromtimestamp(float(ts)).strftime('%Y-%m-%d') for ts in rates_timestamps_raw]
-        rates_list = [
+    # 获取币安K线数据
+    binance_url = "https://api.binance.com/api/v3/klines"
+    binance_params = {
+        "symbol": "ICPUSDT",
+        "interval": "1d",
+        "limit": 10000
+    }
+    binance_resp = requests.get(binance_url, params=binance_params)
+    if binance_resp.status_code == 200:
+        binance_data = binance_resp.json()
+        binance_prices = [
             {
-                "date": rates_timestamps[i],
-                "rate": rates[i]
+                "date": datetime.utcfromtimestamp(item[0] // 1000).strftime('%Y-%m-%d'),
+                "open": float(item[1]),
+                "high": float(item[2]),
+                "low": float(item[3]),
+                "close": float(item[4]),
+                "volume": float(item[5])
             }
-            for i in range(len(rates_timestamps))
+            for item in binance_data
         ]
-        result["conversion_rates"] = rates_list
+        result["binance_prices"] = binance_prices
     else:
-        result["rates_error"] = "No icp_xdr_conversion_rates data found."
-        result["rates_raw"] = data_rates
+        result["binance_error"] = f"Failed to fetch Binance data: {binance_resp.text}"
+
+    # 获取OKX K线数据
+    okx_url = "https://www.okx.com/api/v5/market/history-candles"
+    okx_params = {
+        "instId": "ICP-USDT",
+        "bar": "1D",
+        "limit": "1000"  # OKX单次最多1000，需分页拉取
+    }
+    okx_prices = []
+    next_after = None
+    for _ in range(10):  # 最多拉10页
+        if next_after:
+            okx_params["after"] = next_after
+        okx_resp = requests.get(okx_url, params=okx_params)
+        if okx_resp.status_code == 200:
+            okx_data = okx_resp.json()
+            if okx_data.get("code") == "0" and okx_data.get("data"):
+                for item in okx_data["data"]:
+                    okx_prices.append({
+                        "date": datetime.utcfromtimestamp(int(item[0]) // 1000).strftime('%Y-%m-%d'),
+                        "open": float(item[1]),
+                        "high": float(item[2]),
+                        "low": float(item[3]),
+                        "close": float(item[4]),
+                        "volume": float(item[5])
+                    })
+                # OKX返回的数据是倒序排列，获取下一页的after参数
+                next_after = okx_data["data"][-1][0]
+                if len(okx_data["data"]) < 1000:
+                    break
+            else:
+                break
+        else:
+            result["okx_error"] = f"Failed to fetch OKX data: {okx_resp.text}"
+            break
+    result["okx_prices"] = okx_prices[::-1]  # 正序排列
 
     return jsonify(result)
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=8080)
+    app.run(host="0.0.0.0", port=
