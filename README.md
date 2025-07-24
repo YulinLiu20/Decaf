@@ -1,5 +1,6 @@
 Brewed for Research. Powered by Canisters.
-decaf.yulinliu.me
+
+https://decaf.yulinliu.me
 
 **DeCaf** (Decentralized Canister Feed) is a data infrastructure project designed to unlock the rich, underutilized data on the Internet Computer (ICP) blockchain. While ecosystems like Ethereum benefit from advanced analytics platforms (e.g. Dune, Glassnode), ICP remains largely inaccessible to researchers, developers, and AI agents.
 
